@@ -1,24 +1,11 @@
-"scripts": {
-  "start": "node server.js",
-  "test": "echo \"Error: no test specified\" && exit 1"
-}
-```
-
-**Add a `.gitignore` file** — create a new file called `.gitignore` in your folder:
-```
-node_modules/
-.env
-
 {
   "name": "carbon-tracker",
   "version": "1.0.0",
-  "description": "",
-  "main": "db.js",
+  "description": "Carbon tracker backend",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js"
   },
-  "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
