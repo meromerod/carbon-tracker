@@ -2,16 +2,10 @@
 const express    = require('express');
 const cors       = require('cors');
 const nodemailer = require('nodemailer');
-process.env.MONGO_URL = process.env.MONGO_URL || 'mongodb://localhost:27017/carbon_tracker';
-const Entry = require('./db');
+const Entry      = require('./db');
 
 const app  = express();
-const PORT = 3000;
-
-app.use(cors());
-app.use(express.json());
-app.use(express.static('.'));
-
+const PORT = process.env.PORT || 3000;
 // ─────────────────────────
 //  ROUTE 1: Save entry
 //  Now includes user name
