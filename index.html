@@ -1,170 +1,516 @@
-// server.js
-const express    = require('express');
-const cors       = require('cors');
-const nodemailer = require('nodemailer');
-const Entry      = require('./db');
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Carbon Footprint Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,400&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{--bg:#f5f0e8;--surface:#ffffff;--earth:#1a2e1a;--moss:#2d4a2d;--leaf:#4a7c4a;--sage:#7ab87a;--lime:#b8e07a;--amber:#d4a843;--sky:#7ab8d4;--rust:#c4622d;--text:#1a2e1a;--muted:#5a7a5a;--border:rgba(74,124,74,0.15);--radius:14px;}
+body.dark{--bg:#0f1a0f;--surface:#1a2e1a;--earth:#b8e07a;--moss:#90c060;--leaf:#7ab87a;--lime:#b8e07a;--amber:#e8b84a;--sky:#70b8e0;--rust:#e07050;--text:#e0f0d0;--muted:#80a870;--border:rgba(122,184,122,0.2);}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;min-height:100vh;transition:background .3s,color .3s;}
+.app{max-width:860px;margin:0 auto;padding:28px 16px 80px;}
+header{display:flex;align-items:center;gap:14px;margin-bottom:28px;flex-wrap:wrap;}
+.logo{width:48px;height:48px;background:var(--earth);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;animation:pulse 3s ease-in-out infinite;}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(74,124,74,0.3);}50%{box-shadow:0 0 0 10px rgba(74,124,74,0);}}
+h1{font-family:'Fraunces',serif;font-size:clamp(20px,4vw,36px);font-weight:700;line-height:1.1;letter-spacing:-1px;}
+h1 em{color:var(--leaf);font-style:italic;}
+.subtitle{font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-top:3px;}
+#dark-btn{margin-left:auto;flex-shrink:0;background:var(--surface);border:1.5px solid var(--border);border-radius:999px;width:38px;height:38px;font-size:16px;cursor:pointer;transition:all .2s;}
+#dark-btn:hover{transform:rotate(20deg);}
+.tabs{display:flex;gap:6px;margin-bottom:24px;overflow-x:auto;padding-bottom:4px;}
+.tab{padding:7px 14px;border:1.5px solid var(--leaf);background:transparent;border-radius:999px;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:0.06em;cursor:pointer;color:var(--leaf);white-space:nowrap;transition:all .2s;}
+.tab.active{background:var(--earth);border-color:var(--earth);color:var(--lime);}
+.tab:hover:not(.active){background:rgba(74,124,74,0.08);}
+.panel{display:none;}.panel.active{display:block;animation:up .3s ease;}
+@keyframes up{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+.hidden{display:none!important;}
+.lbl{font-size:10px;letter-spacing:0.25em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;display:block;}
+.input-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:18px;}
+.icard{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:16px;position:relative;overflow:hidden;transition:border-color .2s,box-shadow .2s;}
+.icard::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--lime);transform:scaleX(0);transform-origin:left;transition:transform .3s;}
+.icard:focus-within{border-color:var(--leaf);box-shadow:0 4px 16px rgba(74,124,74,0.1);}
+.icard:focus-within::before{transform:scaleX(1);}
+.icard.full{grid-column:1/-1;}
+.icard>.icon{font-size:20px;display:block;margin-bottom:7px;}
+.icard>.ilbl{font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px;}
+.icard>.inum{width:100%;border:none;outline:none;font-family:'Fraunces',serif;font-size:24px;font-weight:700;color:var(--text);background:transparent;-moz-appearance:textfield;}
+.icard>.inum::-webkit-outer-spin-button,.icard>.inum::-webkit-inner-spin-button{-webkit-appearance:none;}
+.icard>.iunit{font-size:10px;color:var(--muted);margin-top:2px;}
+.goal-row{display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;}
+.goal-row label{font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);flex-shrink:0;}
+.goal-input{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:6px 12px;font-family:'Fraunces',serif;font-size:18px;font-weight:700;color:var(--text);width:90px;outline:none;}
+.goal-input:focus{border-color:var(--leaf);}
+.goal-unit{font-size:10px;color:var(--muted);}
+.food-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:5px;}
+.fbtn{padding:9px 6px;border:1.5px solid var(--border);border-radius:10px;background:transparent;font-family:'DM Mono',monospace;font-size:10px;cursor:pointer;text-align:center;transition:all .2s;color:var(--text);line-height:1.5;}
+.fbtn span{display:block;font-size:16px;}
+.fbtn.on{background:var(--earth);border-color:var(--earth);color:var(--lime);}
+.fbtn:hover:not(.on){border-color:var(--leaf);background:rgba(74,124,74,0.05);}
+.btn-main{width:100%;padding:15px;background:var(--earth);color:var(--lime);border:none;border-radius:var(--radius);font-family:'Fraunces',serif;font-size:16px;font-style:italic;font-weight:700;cursor:pointer;transition:all .25s;}
+.btn-main:hover{background:var(--moss);transform:translateY(-2px);box-shadow:0 8px 24px rgba(26,46,26,0.2);}
+.btn-main:active{transform:translateY(0);}
+.btn-back{display:block;width:100%;padding:11px;background:transparent;border:1.5px solid var(--border);border-radius:12px;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:0.1em;color:var(--leaf);cursor:pointer;transition:all .2s;margin-top:10px;}
+.btn-back:hover{background:rgba(74,124,74,0.05);border-color:var(--leaf);}
+.hero{background:var(--earth);border-radius:20px;padding:28px;color:var(--bg);margin-bottom:16px;animation:up .4s ease;}
+.hero-lbl{font-size:10px;letter-spacing:0.3em;text-transform:uppercase;opacity:0.6;margin-bottom:5px;}
+.hero-num{font-family:'Fraunces',serif;font-size:clamp(40px,9vw,72px);font-weight:700;color:var(--lime);line-height:1;letter-spacing:-3px;}
+.hero-unit{font-size:13px;opacity:0.6;margin-top:2px;}
+.hero-cmp{font-size:12px;opacity:0.7;margin-top:10px;line-height:1.6;}
+.hero-cmp strong{color:var(--lime);opacity:1;}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;font-size:10px;letter-spacing:0.08em;margin-top:10px;}
+.badge.good{background:rgba(122,184,122,0.2);color:var(--sage);border:1px solid rgba(122,184,122,0.35);}
+.badge.mid{background:rgba(212,168,67,0.2);color:var(--amber);border:1px solid rgba(212,168,67,0.35);}
+.badge.high{background:rgba(196,98,45,0.2);color:var(--rust);border:1px solid rgba(196,98,45,0.35);}
+.goal-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:16px;}
+.goal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.goal-title{font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);}
+.goal-nums{font-family:'Fraunces',serif;font-size:13px;font-weight:700;}
+.goal-track{height:12px;background:rgba(74,124,74,0.1);border-radius:6px;overflow:hidden;margin-bottom:6px;}
+.goal-fill{height:100%;border-radius:6px;transition:width 1.2s cubic-bezier(0.34,1.56,0.64,1);}
+.goal-fill.on-track{background:var(--sage);}
+.goal-fill.over{background:var(--rust);}
+.goal-msg{font-size:11px;color:var(--muted);}
+.weekly-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px;display:flex;gap:16px;align-items:center;flex-wrap:wrap;}
+.weekly-num{font-family:'Fraunces',serif;font-size:32px;font-weight:700;color:var(--text);line-height:1;flex-shrink:0;}
+.weekly-num small{font-size:12px;font-family:'DM Mono',monospace;color:var(--muted);margin-left:4px;font-weight:400;}
+.weekly-title{font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.weekly-sub{font-size:12px;color:var(--muted);line-height:1.5;}
+.bdgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;}
+.bdcard{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px;}
+.bdcard .icon{font-size:18px;}.bdcard .name{font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin:5px 0 3px;}.bdcard .val{font-family:'Fraunces',serif;font-size:19px;font-weight:700;}.bdcard .unit{font-size:9px;color:var(--muted);}
+.bar{height:4px;background:rgba(74,124,74,0.1);border-radius:2px;margin-top:7px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:2px;width:0%;transition:width .8s cubic-bezier(0.34,1.56,0.64,1);}
+.amber-fill{background:var(--amber);}.sky-fill{background:var(--sky);}.green-fill{background:var(--sage);}
+.chart-card{background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:20px;margin-bottom:16px;}
+.chart-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.chart-head .lbl{margin-bottom:0;}
+.chart-btns{display:flex;gap:6px;}
+.cbtn{padding:4px 10px;border:1.5px solid var(--border);background:transparent;border-radius:999px;font-family:'DM Mono',monospace;font-size:10px;cursor:pointer;color:var(--leaf);transition:all .2s;}
+.cbtn.active{background:var(--earth);border-color:var(--earth);color:var(--lime);}
+.chart-wrap{height:190px;position:relative;}
+.cmp-card{background:var(--earth);border-radius:16px;padding:20px;color:var(--bg);margin-bottom:16px;}
+.cmp-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.cmp-row:last-child{margin-bottom:0;}
+.cmp-lbl{font-size:11px;opacity:0.7;min-width:86px;}
+.cmp-track{flex:1;height:8px;background:rgba(255,255,255,0.1);border-radius:4px;overflow:hidden;}
+.cmp-fill{height:100%;border-radius:4px;transition:width 1s cubic-bezier(0.34,1.56,0.64,1);}
+.cmp-fill.you{background:var(--lime);}.cmp-fill.india{background:var(--sage);}.cmp-fill.global{background:var(--sky);}
+.cmp-num{font-family:'Fraunces',serif;font-size:13px;font-weight:700;min-width:46px;text-align:right;}
+.tip{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:13px 16px;display:flex;align-items:flex-start;gap:11px;margin-bottom:9px;transition:all .2s;}
+.tip:hover{border-color:var(--sage);transform:translateX(3px);}
+.tip.hl{border-color:var(--leaf);background:rgba(74,124,74,0.05);}
+.tip .icon{font-size:19px;flex-shrink:0;}.tip .ttxt{font-size:12px;line-height:1.6;}.tip .timp{font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:var(--leaf);margin-top:3px;}
+.tip-tag{display:inline-block;font-size:9px;letter-spacing:0.12em;text-transform:uppercase;background:var(--leaf);color:#fff;padding:2px 8px;border-radius:999px;margin-bottom:4px;}
+.hist-controls{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.btn-csv{padding:7px 14px;background:transparent;border:1.5px solid var(--leaf);border-radius:999px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.08em;cursor:pointer;color:var(--leaf);transition:all .2s;}
+.btn-csv:hover{background:rgba(74,124,74,0.08);}
+.hitem{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:13px 16px;display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;transition:border-color .2s;gap:8px;}
+.hitem:hover{border-color:var(--sage);}
+.hdate{font-size:10px;color:var(--muted);}.hmeta{font-size:10px;color:var(--muted);margin-top:2px;}
+.hval{font-family:'Fraunces',serif;font-size:19px;font-weight:700;white-space:nowrap;}
+.hval small{font-size:11px;font-family:'DM Mono',monospace;color:var(--muted);margin-left:3px;font-weight:400;}
+.hbadge{font-size:10px;padding:3px 9px;border-radius:999px;background:rgba(74,124,74,0.1);color:var(--leaf);white-space:nowrap;}
+.btn-clear{width:100%;padding:10px;margin-top:12px;border:1.5px solid rgba(196,98,45,0.3);background:transparent;color:var(--rust);border-radius:10px;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:0.1em;cursor:pointer;transition:all .2s;}
+.btn-clear:hover{background:rgba(196,98,45,0.05);}
+.score-wrap{background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:32px 20px;text-align:center;margin-bottom:16px;}
+.score-ring{width:120px;height:120px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;}
+.score-inner{width:94px;height:94px;background:var(--surface);border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.score-n{font-family:'Fraunces',serif;font-size:29px;font-weight:700;line-height:1;}
+.score-of{font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);}
+.score-ttl{font-family:'Fraunces',serif;font-size:18px;margin-bottom:4px;}
+.score-dsc{font-size:12px;color:var(--muted);line-height:1.6;max-width:280px;margin:0 auto;}
+.api-status{font-size:10px;padding:4px 10px;border-radius:999px;display:inline-flex;align-items:center;gap:5px;margin-bottom:12px;}
+.api-status.online{background:rgba(122,184,122,0.15);color:var(--sage);border:1px solid rgba(122,184,122,0.3);}
+.api-status.offline{background:rgba(212,168,67,0.12);color:var(--amber);border:1px solid rgba(212,168,67,0.25);}
+.empty{text-align:center;padding:52px 20px;color:var(--muted);}
+.empty .eicon{font-size:40px;margin-bottom:10px;}
+.empty p{font-size:12px;line-height:1.6;}
+@media(max-width:520px){
+  .bdgrid{grid-template-columns:1fr 1fr;}
+  .bdgrid .bdcard:last-child{grid-column:1/-1;}
+  .cmp-row{flex-wrap:wrap;}.cmp-track{min-width:80px;}
+  .hitem{flex-wrap:wrap;}
+  .weekly-card{flex-direction:column;gap:8px;}
+}
+@media(max-width:360px){
+  .tabs{gap:4px;}.tab{padding:6px 10px;font-size:10px;}
+  .food-grid{grid-template-columns:repeat(2,1fr);}
+}
+</style>
+</head>
+<body>
+<div class="app">
 
-const app  = express();
-const PORT = 3000;
+<header>
+  <div class="logo">🌿</div>
+  <div><h1>Carbon <em>Footprint</em> Tracker</h1><p class="subtitle">Personalized Sustainability Insights</p></div>
+  <button id="dark-btn" title="Toggle dark mode">🌙</button>
+</header>
 
-app.use(cors());
-app.use(express.json());
-app.use(express.static('.'));
+<nav class="tabs">
+  <button class="tab active" data-tab="calc">📊 Calculate</button>
+  <button class="tab"        data-tab="hist">📅 History</button>
+  <button class="tab"        data-tab="tips">💡 Tips</button>
+  <button class="tab"        data-tab="score">🏅 Score</button>
+</nav>
 
-// ─────────────────────────
-//  ROUTE 1: Save entry
-//  Now includes user name
-// ─────────────────────────
-app.post('/api/save', async function(req, res) {
-  try {
-    const entry = new Entry({
-      user:  req.body.user || 'anonymous',   // NEW
-      total: req.body.total,
-      t:     req.body.t,
-      e:     req.body.e,
-      f:     req.body.f,
-      food:  req.body.food,
-      date:  req.body.date
-    });
-    await entry.save();
-    res.json({ success: true, entry });
-  } catch (err) {
-    res.status(500).json({ error: 'Could not save entry' });
-  }
-});
-
-// ─────────────────────────
-//  ROUTE 2: Get history
-//  Filtered by user
-// ─────────────────────────
-app.get('/api/history', async function(req, res) {
-  try {
-    const user = req.query.user || 'anonymous';   // NEW — ?user=Arjun
-    const entries = await Entry.find({ user: user })
-      .sort({ savedAt: -1 })
-      .limit(30);
-    res.json(entries);
-  } catch (err) {
-    res.status(500).json({ error: 'Could not fetch history' });
-  }
-});
-
-// ─────────────────────────
-//  ROUTE 3: Weekly average
-//  Filtered by user
-// ─────────────────────────
-app.get('/api/weekly', async function(req, res) {
-  try {
-    const user = req.query.user || 'anonymous';
-    const entries = await Entry.find({ user: user })
-      .sort({ savedAt: -1 })
-      .limit(7);
-
-    if (!entries.length) return res.json({ avg: null, count: 0 });
-
-    const avg = entries.reduce(function(s, e) {
-      return s + e.total;
-    }, 0) / entries.length;
-
-    res.json({ avg: parseFloat(avg.toFixed(2)), count: entries.length });
-  } catch (err) {
-    res.status(500).json({ error: 'Could not compute weekly average' });
-  }
-});
-
-// ─────────────────────────
-//  ROUTE 4: Trend data     NEW
-//  Last 14 entries for chart
-// ─────────────────────────
-app.get('/api/trend', async function(req, res) {
-  try {
-    const user = req.query.user || 'anonymous';
-    const entries = await Entry.find({ user: user })
-      .sort({ savedAt: -1 })
-      .limit(14);
-
-    // Reverse so oldest is first (left side of chart)
-    const trend = entries.reverse().map(function(e) {
-      return { date: e.date, total: e.total };
-    });
-
-    res.json(trend);
-  } catch (err) {
-    res.status(500).json({ error: 'Could not fetch trend' });
-  }
-});
-
-// ─────────────────────────
-//  ROUTE 5: Delete history
-//  Only this user's entries
-// ─────────────────────────
-app.delete('/api/history', async function(req, res) {
-  try {
-    const user = req.query.user || 'anonymous';
-    await Entry.deleteMany({ user: user });
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Could not clear history' });
-  }
-});
-
-// ─────────────────────────
-//  ROUTE 6: Send email report   NEW
-// ─────────────────────────
-app.post('/api/email', async function(req, res) {
-  try {
-    const { to, user, avg, count, latest } = req.body;
-
-    // Nodemailer transporter — using Gmail
-    // You need to enable "App Passwords" in your Google account
-    // Go to: myaccount.google.com → Security → 2-Step Verification → App Passwords
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: 'YOUR_GMAIL@gmail.com',     // replace with your Gmail
-        pass: 'YOUR_APP_PASSWORD'          // replace with your App Password (not your normal password)
-      }
-    });
-
-    const mailOptions = {
-      from:    'YOUR_GMAIL@gmail.com',
-      to:      to,
-      subject: '🌿 Your Weekly Carbon Footprint Report',
-      html: `
-        <div style="font-family:monospace;max-width:500px;margin:0 auto;padding:24px;background:#f5f0e8;border-radius:16px;">
-          <h1 style="font-family:Georgia,serif;color:#1a2e1a;font-size:28px;margin-bottom:4px;">
-            Weekly Report
-          </h1>
-          <p style="color:#5a7a5a;font-size:12px;margin-bottom:24px;">for ${user}</p>
-
-          <div style="background:#1a2e1a;border-radius:12px;padding:20px;margin-bottom:16px;color:#f5f0e8;">
-            <p style="font-size:10px;letter-spacing:0.2em;text-transform:uppercase;opacity:0.6;margin-bottom:4px;">7-day average</p>
-            <p style="font-family:Georgia,serif;font-size:48px;font-weight:700;color:#b8e07a;line-height:1;margin:0;">${avg}</p>
-            <p style="font-size:13px;opacity:0.6;margin-top:2px;">kg CO₂ / day (${count} entries)</p>
-          </div>
-
-          <div style="background:#ffffff;border-radius:12px;padding:16px;margin-bottom:16px;">
-            <p style="font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:#5a7a5a;margin-bottom:8px;">Latest entry</p>
-            <p style="font-family:Georgia,serif;font-size:22px;font-weight:700;color:#1a2e1a;">${latest} kg CO₂</p>
-            <p style="font-size:11px;color:#5a7a5a;">Transport + Electricity + Food</p>
-          </div>
-
-          <p style="font-size:11px;color:#5a7a5a;text-align:center;margin-top:20px;">
-            Keep tracking at <strong>localhost:3000</strong> 🌱
-          </p>
+<!-- CALCULATE -->
+<section id="panel-calc" class="panel active">
+  <div id="inputs">
+    <span class="lbl">Today's Activity</span>
+    <div class="goal-row">
+      <label>Daily goal</label>
+      <input id="goal-input" class="goal-input" type="number" value="5" min="1" step="0.5"/>
+      <span class="goal-unit">kg CO₂ / day</span>
+    </div>
+    <div class="input-grid">
+      <div class="icard">
+        <span class="icon">🚗</span>
+        <label class="ilbl" for="inp-dist">Distance Traveled</label>
+        <input id="inp-dist" class="inum" type="number" value="20" min="0" step="1"/>
+        <span class="iunit">km / day</span>
+      </div>
+      <div class="icard">
+        <span class="icon">⚡</span>
+        <label class="ilbl" for="inp-elec">Electricity Usage</label>
+        <input id="inp-elec" class="inum" type="number" value="8" min="0" step="0.5"/>
+        <span class="iunit">kWh / day</span>
+      </div>
+      <div class="icard full">
+        <span class="icon">🍽️</span>
+        <span class="ilbl">Diet Type</span>
+        <div class="food-grid">
+          <button class="fbtn on" data-food="vegan"><span>🌱</span>Vegan</button>
+          <button class="fbtn" data-food="vegetarian"><span>🥗</span>Vegetarian</button>
+          <button class="fbtn" data-food="mixed"><span>🍳</span>Mixed</button>
+          <button class="fbtn" data-food="meat_low"><span>🐟</span>Low Meat</button>
+          <button class="fbtn" data-food="meat_med"><span>🍗</span>Med Meat</button>
+          <button class="fbtn" data-food="meat_high"><span>🥩</span>High Meat</button>
         </div>
-      `
-    };
+      </div>
+    </div>
+    <button class="btn-main" id="btn-calc">Calculate My Footprint →</button>
+  </div>
 
-    await transporter.sendMail(mailOptions);
-    res.json({ success: true });
+  <div id="results" class="hidden">
+    <div class="hero">
+      <p class="hero-lbl">Your Daily Carbon Footprint</p>
+      <p class="hero-num" id="r-total">0.00</p>
+      <p class="hero-unit">kg CO₂ equivalent / day</p>
+      <div id="r-badge"></div>
+      <p class="hero-cmp" id="r-cmp"></p>
+    </div>
 
-  } catch (err) {
-    console.error('Email error:', err.message);
-    res.status(500).json({ error: err.message });
+    <div class="goal-card">
+      <div class="goal-header">
+        <span class="goal-title">Progress toward goal</span>
+        <span class="goal-nums" id="goal-nums">— / — kg</span>
+      </div>
+      <div class="goal-track"><div class="goal-fill" id="goal-fill" style="width:0%"></div></div>
+      <p class="goal-msg" id="goal-msg"></p>
+    </div>
+
+    <div class="weekly-card">
+      <div class="weekly-num" id="weekly-num">—<small>kg</small></div>
+      <div><p class="weekly-title">7-day average</p><p class="weekly-sub" id="weekly-sub">Calculate more entries to see your trend.</p></div>
+    </div>
+
+    <div class="bdgrid">
+      <div class="bdcard"><span class="icon">🚗</span><p class="name">Transport</p><p class="val" id="r-t">0</p><p class="unit">kg CO₂</p><div class="bar"><div class="bar-fill amber-fill" id="bar-t"></div></div></div>
+      <div class="bdcard"><span class="icon">⚡</span><p class="name">Electricity</p><p class="val" id="r-e">0</p><p class="unit">kg CO₂</p><div class="bar"><div class="bar-fill sky-fill" id="bar-e"></div></div></div>
+      <div class="bdcard"><span class="icon">🍽️</span><p class="name">Food</p><p class="val" id="r-f">0</p><p class="unit">kg CO₂</p><div class="bar"><div class="bar-fill green-fill" id="bar-f"></div></div></div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-head">
+        <span class="lbl">Emission Breakdown</span>
+        <div class="chart-btns">
+          <button class="cbtn active" data-ctype="bar">Bar</button>
+          <button class="cbtn" data-ctype="doughnut">Doughnut</button>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="chart"></canvas></div>
+    </div>
+
+    <div class="cmp-card">
+      <span class="lbl" style="color:rgba(245,240,232,0.55)">How You Compare</span>
+      <div class="cmp-row"><span class="cmp-lbl">Your footprint</span><div class="cmp-track"><div class="cmp-fill you" id="cmp-you" style="width:0%"></div></div><span class="cmp-num" id="cmp-you-n">—</span></div>
+      <div class="cmp-row"><span class="cmp-lbl">India avg</span><div class="cmp-track"><div class="cmp-fill india" style="width:64%"></div></div><span class="cmp-num" style="color:var(--sage)">4.7 kg</span></div>
+      <div class="cmp-row"><span class="cmp-lbl">Global avg</span><div class="cmp-track"><div class="cmp-fill global" style="width:100%"></div></div><span class="cmp-num" style="color:var(--sky)">7.3 kg</span></div>
+    </div>
+
+    <button class="btn-back" id="btn-back">← Calculate Again</button>
+  </div>
+</section>
+
+<!-- HISTORY -->
+<section id="panel-hist" class="panel">
+  <div class="hist-controls">
+    <span class="lbl" style="margin-bottom:0;align-self:center">Past Calculations</span>
+    <button class="btn-csv" id="btn-csv">⬇ Export CSV</button>
+  </div>
+  <div id="api-badge"></div>
+  <div id="hist-list"></div>
+</section>
+
+<!-- TIPS -->
+<section id="panel-tips" class="panel">
+  <span class="lbl">Sustainability Suggestions</span>
+  <div id="tips-list"></div>
+</section>
+
+<!-- SCORE -->
+<section id="panel-score" class="panel">
+  <span class="lbl">Your Green Score</span>
+  <div id="score-out"></div>
+</section>
+
+</div>
+<script>
+var FACTORS={transport:0.21,electricity:0.82,food:{vegan:1.5,vegetarian:2.0,mixed:3.0,meat_low:4.0,meat_med:5.5,meat_high:7.5}};
+var INDIA=4.7,GLOBAL=7.3,API = 'https://carbon-tracker-xxxx.onrender.com/api';;
+var TIPS_DATA=[
+  {icon:'🚌',cat:'transport',  text:'Switch from private car to public transit for your daily commute.',       impact:'↓ up to 2.4 kg CO₂/day'},
+  {icon:'🚲',cat:'transport',  text:'Cycle or walk for trips under 5 km — zero emission and great for health.',impact:'↓ up to 1.0 kg CO₂/day'},
+  {icon:'🚗',cat:'transport',  text:'Carpool with colleagues — splitting one trip halves emissions.',           impact:'↓ up to 1.2 kg CO₂/day'},
+  {icon:'☀️',cat:'electricity',text:'Install rooftop solar or switch to a green energy provider.',             impact:'↓ up to 5.5 kg CO₂/day'},
+  {icon:'💡',cat:'electricity',text:'Replace old appliances with BEE 5-star models. LED bulbs use 75% less.',  impact:'↓ up to 1.2 kg CO₂/day'},
+  {icon:'🔌',cat:'electricity',text:'Unplug devices on standby — phantom load can be 10% of your bill.',       impact:'↓ up to 0.8 kg CO₂/day'},
+  {icon:'🥦',cat:'food',       text:'Shift one meal per day from meat to plant-based food.',                    impact:'↓ up to 1.5 kg CO₂/day'},
+  {icon:'🛒',cat:'food',       text:'Buy local, seasonal produce to cut logistics-related emissions.',          impact:'↓ up to 0.4 kg CO₂/day'},
+  {icon:'♻️',cat:'food',       text:'Reduce food waste — rotting food in landfills releases methane.',          impact:'↓ up to 0.3 kg CO₂/day'},
+];
+var selectedFood='vegan',chartInst=null,chartType='bar',lastCalc=null;
+var localHistory=JSON.parse(localStorage.getItem('cf_hist')||'[]');
+var backendOnline=false;
+
+document.addEventListener('DOMContentLoaded',function(){
+  // check backend
+  fetch(API+'/history').then(function(){backendOnline=true;}).catch(function(){backendOnline=false;});
+
+  // tabs
+  document.querySelectorAll('.tab').forEach(function(tab){
+    tab.addEventListener('click',function(){
+      document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
+      document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active');});
+      tab.classList.add('active');
+      document.getElementById('panel-'+tab.dataset.tab).classList.add('active');
+      if(tab.dataset.tab==='hist') renderHistory();
+      if(tab.dataset.tab==='score') renderScore(lastCalc?lastCalc.total:(localHistory.length?localHistory[0].total:null));
+    });
+  });
+
+  // food
+  document.querySelectorAll('.fbtn').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      document.querySelectorAll('.fbtn').forEach(function(b){b.classList.remove('on');});
+      btn.classList.add('on'); selectedFood=btn.dataset.food;
+    });
+  });
+
+  document.getElementById('btn-calc').addEventListener('click',calculate);
+  document.getElementById('btn-back').addEventListener('click',function(){
+    document.getElementById('inputs').classList.remove('hidden');
+    document.getElementById('results').classList.add('hidden');
+  });
+
+  // dark mode
+  if(localStorage.getItem('dark')==='1'){document.body.classList.add('dark');document.getElementById('dark-btn').textContent='☀️';}
+  document.getElementById('dark-btn').addEventListener('click',function(){
+    var d=document.body.classList.toggle('dark');
+    document.getElementById('dark-btn').textContent=d?'☀️':'🌙';
+    localStorage.setItem('dark',d?'1':'0');
+    if(lastCalc) buildChart(lastCalc.t,lastCalc.e,lastCalc.f);
+  });
+
+  // chart type
+  document.querySelectorAll('.cbtn').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      document.querySelectorAll('.cbtn').forEach(function(b){b.classList.remove('active');});
+      btn.classList.add('active'); chartType=btn.dataset.ctype;
+      if(lastCalc) buildChart(lastCalc.t,lastCalc.e,lastCalc.f);
+    });
+  });
+
+  document.getElementById('btn-csv').addEventListener('click',exportCSV);
+  renderTips(null);
+  renderScore(localHistory.length?localHistory[0].total:null);
+});
+
+function calculate(){
+  var dist=parseFloat(document.getElementById('inp-dist').value)||0;
+  var elec=parseFloat(document.getElementById('inp-elec').value)||0;
+  var goal=parseFloat(document.getElementById('goal-input').value)||5;
+  var t=parseFloat((dist*FACTORS.transport).toFixed(2));
+  var e=parseFloat((elec*FACTORS.electricity).toFixed(2));
+  var f=FACTORS.food[selectedFood];
+  var total=parseFloat((t+e+f).toFixed(2));
+  lastCalc={t:t,e:e,f:f,total:total};
+
+  document.getElementById('inputs').classList.add('hidden');
+  document.getElementById('results').classList.remove('hidden');
+
+  countUp('r-total',total);
+  var cls=total<INDIA*0.7?'good':total<=INDIA*1.2?'mid':'high';
+  var txt=total<INDIA*0.7?'✅ Below Average — Excellent!':total<=INDIA*1.2?'⚡ Near Average — Room to improve':'🔥 Above Average — Let\'s reduce this';
+  document.getElementById('r-badge').innerHTML='<span class="badge '+cls+'">'+txt+'</span>';
+  var vi=total<INDIA?Math.round((INDIA-total)/INDIA*100)+'% below':Math.round((total-INDIA)/INDIA*100)+'% above';
+  var vg=total<GLOBAL?Math.round((GLOBAL-total)/GLOBAL*100)+'% below':Math.round((total-GLOBAL)/GLOBAL*100)+'% above';
+  document.getElementById('r-cmp').innerHTML='You are <strong>'+vi+'</strong> India\'s average and <strong>'+vg+'</strong> the global average.';
+
+  // goal progress
+  var pct=Math.min((total/goal)*100,100);
+  var over=total>goal;
+  document.getElementById('goal-nums').textContent=total+' / '+goal+' kg';
+  document.getElementById('goal-fill').className='goal-fill '+(over?'over':'on-track');
+  document.getElementById('goal-msg').textContent=over
+    ?'⚠ '+(total-goal).toFixed(2)+' kg over your goal today'
+    :'✅ '+(goal-total).toFixed(2)+' kg under your goal — well done!';
+  setTimeout(function(){document.getElementById('goal-fill').style.width=pct+'%';},100);
+
+  // breakdown bars
+  document.getElementById('r-t').textContent=t;
+  document.getElementById('r-e').textContent=e;
+  document.getElementById('r-f').textContent=f;
+  setTimeout(function(){
+    document.getElementById('bar-t').style.width=total>0?(t/total*100)+'%':'0%';
+    document.getElementById('bar-e').style.width=total>0?(e/total*100)+'%':'0%';
+    document.getElementById('bar-f').style.width=total>0?(f/total*100)+'%':'0%';
+  },100);
+
+  buildChart(t,e,f);
+
+  var max=Math.max(total,GLOBAL)*1.1;
+  document.getElementById('cmp-you-n').textContent=total+' kg';
+  setTimeout(function(){document.getElementById('cmp-you').style.width=(total/max*100)+'%';},300);
+
+  var entry={total:total,t:t,e:e,f:f,food:selectedFood,date:new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})};
+  saveEntry(entry);
+  loadWeekly();
+  renderTips({t:t,e:e,f:f});
+  renderScore(total);
+}
+
+function saveEntry(entry){
+  localHistory.unshift(entry);
+  if(localHistory.length>30) localHistory.pop();
+  localStorage.setItem('cf_hist',JSON.stringify(localHistory));
+  if(backendOnline){
+    fetch(API+'/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(entry)})
+      .catch(function(){backendOnline=false;});
   }
-});
+}
 
-app.listen(PORT, function() {
-  console.log('Server running at http://localhost:' + PORT);
-});
+function loadWeekly(){
+  if(backendOnline){
+    fetch(API+'/weekly').then(function(r){return r.json();}).then(function(d){showWeekly(d.avg,d.count);}).catch(weeklyFromLocal);
+  } else { weeklyFromLocal(); }
+}
+
+function weeklyFromLocal(){
+  var last7=localHistory.slice(0,7);
+  if(!last7.length){showWeekly(null,0);return;}
+  var avg=last7.reduce(function(s,e){return s+e.total;},0)/last7.length;
+  showWeekly(parseFloat(avg.toFixed(2)),last7.length);
+}
+
+function showWeekly(avg,count){
+  if(!avg){document.getElementById('weekly-num').innerHTML='—<small>kg</small>';document.getElementById('weekly-sub').textContent='Calculate more entries to see your trend.';return;}
+  document.getElementById('weekly-num').innerHTML=avg+'<small>kg</small>';
+  var trend=avg<INDIA?'below India\'s average':'above India\'s average';
+  document.getElementById('weekly-sub').textContent='Based on last '+count+' entries. You are '+trend+'.';
+}
+
+function buildChart(t,e,f){
+  var ctx=document.getElementById('chart').getContext('2d');
+  if(chartInst) chartInst.destroy();
+  var labels=['Transport 🚗','Electricity ⚡','Food 🍽️'],data=[t,e,f];
+  var bg=['rgba(212,168,67,0.85)','rgba(122,184,212,0.85)','rgba(122,184,122,0.85)'];
+  var bdr=['#d4a843','#7ab8d4','#7ab87a'];
+  if(chartType==='bar'){
+    chartInst=new Chart(ctx,{type:'bar',data:{labels:labels,datasets:[{label:'kg CO₂',data:data,backgroundColor:bg,borderColor:bdr,borderWidth:2,borderRadius:8}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return ' '+c.parsed.y+' kg CO₂';}}}},
+        scales:{y:{beginAtZero:true,ticks:{font:{family:'DM Mono',size:10},color:'#5a7a5a',callback:function(v){return v+' kg';}},grid:{color:'rgba(74,124,74,0.08)'}},x:{ticks:{font:{family:'DM Mono',size:10},color:'#5a7a5a'},grid:{display:false}}}}});
+  } else {
+    chartInst=new Chart(ctx,{type:'doughnut',data:{labels:labels,datasets:[{label:'kg CO₂',data:data,backgroundColor:bg,borderColor:bdr,borderWidth:2,hoverOffset:8}]},
+      options:{responsive:true,maintainAspectRatio:false,cutout:'65%',
+        plugins:{legend:{display:true,position:'bottom',labels:{font:{family:'DM Mono',size:10},color:'#5a7a5a',padding:12,usePointStyle:true}},
+          tooltip:{callbacks:{label:function(c){var s=c.dataset.data.reduce(function(a,b){return a+b;},0);return ' '+c.label+': '+c.parsed+' kg ('+((c.parsed/s)*100).toFixed(1)+'%)';}}}}}});
+  }
+}
+
+function countUp(id,target){
+  var el=document.getElementById(id),start=performance.now(),dur=800;
+  function step(now){var p=Math.min((now-start)/dur,1),ease=p<0.5?2*p*p:-1+(4-2*p)*p;el.textContent=(target*ease).toFixed(2);if(p<1)requestAnimationFrame(step);else el.textContent=target.toFixed(2);}
+  requestAnimationFrame(step);
+}
+
+function exportCSV(){
+  if(!localHistory.length){alert('No history to export yet.');return;}
+  var rows=['Date,Total kg CO2,Transport kg,Electricity kg,Food kg,Diet'];
+  localHistory.forEach(function(h){rows.push([h.date,h.total,h.t,h.e,h.f,h.food].join(','));});
+  var blob=new Blob([rows.join('\n')],{type:'text/csv'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;a.download='carbon-footprint-history.csv';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+}
+
+function renderHistory(){
+  var el=document.getElementById('hist-list');
+  var badge=document.getElementById('api-badge');
+  badge.innerHTML=backendOnline
+    ?'<span class="api-status online">🟢 Connected to backend — data saved to MongoDB</span>'
+    :'<span class="api-status offline">🟡 Offline mode — using localStorage (start server.js to enable backend)</span>';
+  if(backendOnline){
+    fetch(API+'/history').then(function(r){return r.json();}).then(function(d){renderHistoryList(el,d);}).catch(function(){renderHistoryList(el,localHistory);});
+  } else {renderHistoryList(el,localHistory);}
+}
+
+function renderHistoryList(el,data){
+  if(!data.length){el.innerHTML='<div class="empty"><div class="eicon">📭</div><p>No calculations yet.<br>Go to Calculate to track your first entry.</p></div>';return;}
+  var html=data.map(function(h){
+    var badge=h.total<INDIA?'🟢 Low':h.total<GLOBAL?'🟡 Mid':'🔴 High';
+    return '<div class="hitem"><div><div class="hdate">'+h.date+'</div><div class="hmeta">'+h.food+' · T:'+h.t+' E:'+h.e+' F:'+h.f+' kg</div></div><div class="hval">'+h.total+'<small>kg CO₂</small></div><div class="hbadge">'+badge+'</div></div>';
+  }).join('');
+  html+='<button class="btn-clear" id="btn-clear">🗑 Clear All History</button>';
+  el.innerHTML=html;
+  document.getElementById('btn-clear').addEventListener('click',function(){
+    if(!confirm('Clear all history?')) return;
+    localHistory=[];localStorage.removeItem('cf_hist');
+    if(backendOnline) fetch(API+'/history',{method:'DELETE'}).catch(function(){});
+    renderHistory();
+  });
+}
+
+function renderTips(res){
+  var el=document.getElementById('tips-list');
+  var worst=null;
+  if(res){worst=res.t>=res.e&&res.t>=res.f?'transport':res.e>=res.f?'electricity':'food';}
+  var sorted=TIPS_DATA.slice().sort(function(a,b){if(a.cat===worst&&b.cat!==worst)return -1;if(b.cat===worst&&a.cat!==worst)return 1;return 0;});
+  el.innerHTML=sorted.map(function(tip){
+    var hl=tip.cat===worst;
+    return '<div class="tip'+(hl?' hl':'')+'"><span class="icon">'+tip.icon+'</span><div>'+(hl?'<span class="tip-tag">⚠ Your biggest source</span><br>':'')+'<span class="ttxt">'+tip.text+'</span><p class="timp">'+tip.impact+'</p></div></div>';
+  }).join('');
+}
+
+function renderScore(total){
+  var el=document.getElementById('score-out');
+  if(total===null||total===undefined){el.innerHTML='<div class="empty"><div class="eicon">🏅</div><p>Calculate your footprint first<br>to see your score.</p></div>';return;}
+  var score=Math.max(0,Math.round((1-total/(GLOBAL*2))*100));
+  var label,desc;
+  if(score>=75){label='Eco Champion';desc='Outstanding! Your footprint is well below average.';}
+  else if(score>=50){label='Green Aware';desc='Good progress. A few changes could make you an Eco Champion.';}
+  else if(score>=25){label='Getting There';desc='Small daily changes add up fast. Keep going!';}
+  else{label='Start Here';desc='High footprint — but many easy wins are ahead!';}
+  var ring='background:conic-gradient(var(--leaf) '+score+'%, rgba(74,124,74,0.12) 0%)';
+  el.innerHTML='<div class="score-wrap"><div class="score-ring" style="'+ring+'"><div class="score-inner"><p class="score-n">'+score+'</p><p class="score-of">/ 100</p></div></div><p class="score-ttl">'+label+'</p><p class="score-dsc">'+desc+'</p></div>'
+    +'<div class="tip"><span class="icon">🌱</span><div><span class="ttxt">Your score improves every time you lower your total CO₂.</span><p class="timp">Calculate daily to track progress</p></div></div>'
+    +(total>INDIA?'<div class="tip"><span class="icon">⚡</span><div><span class="ttxt">You\'re above India\'s average. Try switching off appliances on standby.</span></div></div>':'<div class="tip"><span class="icon">🎉</span><div><span class="ttxt">You\'re below India\'s average — share these habits with friends!</span></div></div>');
+}
+</script>
+</body>
+</html>
